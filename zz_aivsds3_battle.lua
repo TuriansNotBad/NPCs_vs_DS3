@@ -60,8 +60,8 @@ function Shitbird:DashAttack_Act01( ai, goal )
 	ai:AddTeamRecord( COORDINATE_TYPE_Attack, target, 0 );
 	
 	-- dash and l1 spooky attack
-	goal:AddSubGoal(GOAL_COMMON_DashTarget, 3, target, 5, TARGET_SELF, -1)
-	goal:AddSubGoal(GOAL_COMMON_AttackTunableSpin, 10, NPC_ATK_L1, target, 999, 0, 0)
+	goal:AddSubGoal(GOAL_COMMON_DashTarget, 3, target, 5, TARGET_SELF, -1);
+	goal:AddSubGoal(GOAL_COMMON_AttackTunableSpin, 10, NPC_ATK_L1, target, 999, 0, 0);
 	
 	return 100;
 	

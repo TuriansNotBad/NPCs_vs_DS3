@@ -1,4 +1,4 @@
-
+-- log:clear("logAM");
 -- list of managed AIs
 local ais = {};
 -- list of managed attacks
@@ -16,7 +16,7 @@ AttackManager = {};
 AttackManager.eventSlot = 1;
 
 function AttackManager:RegisterAI( ai, battleGoalTbl )
-	table.insert( ais, ai:GetNpcThinkParamID(), { obj = ai, tbl = battleGoalTbl, injected = false } );
+	ais[ ai:GetNpcThinkParamID() ] = { obj = ai, tbl = battleGoalTbl, injected = false };
 end
 
 function AttackManager:SetEventSlot( eventSlot )
@@ -24,18 +24,24 @@ function AttackManager:SetEventSlot( eventSlot )
 end
 
 function AttackManager:RegisterAttack( attackId, fOnStart, fOnFinish, fOnAttack, fOnEndAttack, fOnLockRotation )
-	table.insert(
-		attacks,
-		{
-			id = attackId,
-			OnStart = fOnStart,					-- when the animation starts
-			OnFinish = fOnFinish,				-- when the animation finishes
-			OnAttack = fOnAttack,				-- when the attack hitbox appears
-			OnEndAttack = fOnEndAttack,			-- when the attack hitbox goes away
-			OnLockRotation = fOnLockRotation	-- when the objects rotation is set to very small value
-		}
-	);
+	
+	-- already registered
+	for i = 1, attacks.n do
+		if ( attacks[i].id == attackId ) then
+			return;
+		end
+	end
+	
+	attacks[ attacks.n + 1 ] = {
+		id = attackId,
+		OnStart = fOnStart,					-- when the animation starts
+		OnFinish = fOnFinish,				-- when the animation finishes
+		OnAttack = fOnAttack,				-- when the attack hitbox appears
+		OnEndAttack = fOnEndAttack,			-- when the attack hitbox goes away
+		OnLockRotation = fOnLockRotation	-- when the objects rotation is set to very small value
+	};
 	attacks.n = attacks.n + 1;
+	
 end
 
 local function ListenerCaller( tbl, ai, goal, func )
@@ -58,26 +64,27 @@ function AttackManager:InjectInterrupt( ai, tbl )
 	
 	-- set up an interrupt
 	tbl.Interrupt_EventRequest = function( tbl, ai, goal )
-		
 		-- get event
 		local eventNo = ai:GetEventRequest( AttackManager.eventSlot );
+		-- log( ai, "logAM", oldFunc );
 		
 		-- find out if we should call one
 		for i = 1, attacks.n do
+			-- log( ai, "logAM", attacks, " ", attacks.n, " ", table.getn(attacks), " ", attacks[i] );
 			-- when the animation starts
-			if ( attacks[i] == eventNo + eventStartOffset ) then
+			if ( attacks[i].id == eventNo - eventStartOffset ) then
 				ListenerCaller( tbl, ai, goal, attacks[i].OnStart );
 			-- when the objects rotation is set to very small value
-			elseif ( attacks[i] == eventNo + eventLockRotationOffset ) then
+			elseif ( attacks[i].id == eventNo - eventLockRotationOffset ) then
 				ListenerCaller( tbl, ai, goal, attacks[i].OnLockRotation );
 			-- when the attack hitbox appears
-			elseif ( attacks[i] == eventNo + eventAttackOffset ) then
+			elseif ( attacks[i].id == eventNo - eventAttackOffset ) then
 				ListenerCaller( tbl, ai, goal, attacks[i].OnAttack );
 			-- when the attack hitbox goes away
-			elseif ( attacks[i] == eventNo + eventEndAttackOffset ) then
+			elseif ( attacks[i].id == eventNo - eventEndAttackOffset ) then
 				ListenerCaller( tbl, ai, goal, attacks[i].OnEndAttack );
 			-- when the animation finishes
-			elseif ( attacks[i] == eventNo + eventFinishOffset ) then
+			elseif ( attacks[i].id == eventNo - eventFinishOffset ) then
 				ListenerCaller( tbl, ai, goal, attacks[i].OnFinish );
 			end
 		end

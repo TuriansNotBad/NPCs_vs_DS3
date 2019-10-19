@@ -85,6 +85,37 @@ function REGIST_TFUNC(t, ai, goal, f, paramTbl)
 	end
 end
 
+function InsideRangeEx( ai, target, angleBase, angleRange, distMin, distMax )
+
+	local targetDist = ai:GetDist(target); -- distance to target
+	
+	-- check if target within specified distance range bounds
+	if distMin <= targetDist and targetDist <= distMax then
+	
+		local targetAngle = ai:GetToTargetAngle(target); -- angle to target
+		
+		local sign = 0;
+		if angleBase < 0 then
+			sign = -1;
+		else
+			sign = 1;
+		end
+		-- check if current angle is within angle range from base angle
+		if (angleBase + angleRange / -2 <= targetAngle and targetAngle <= angleBase + angleRange / 2)
+			-- allows you to also use angleBase values such that 180 <= angleBase <= 360
+			or (angleBase + angleRange / -2 <= targetAngle + 360 * sign and targetAngle + 360 * sign <= angleBase + angleRange / 2)
+		then
+			return true;
+		else
+			return false;
+		end
+		
+	else
+		return false;
+	end
+	
+end
+
 log = {};
 log.on = true;
 log.showTime = true;
@@ -171,7 +202,7 @@ function	WalkAndPlunge_Update(ai, goal)
 
 	local target = goal:GetParam(0);
 	local margin = goal:GetParam(1);
-	log( ai, "bt", ai:GetDistYSigned(target));
+	-- log( ai, "bt", ai:GetDistYSigned(target));
 	-- if we below height for plunge - do it
 	if ( margin <= ai:GetDistYSigned(target) ) then
 		ai:SetAttackRequest( NPC_ATK_R1 );

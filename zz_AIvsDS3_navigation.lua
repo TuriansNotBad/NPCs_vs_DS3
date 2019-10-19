@@ -5,6 +5,7 @@ local nav = "nav"; -- lazy, for logging
 COORDINATE_TYPE_PlungeReady = 120;
 COORDINATE_TYPE_GreetsReady = 119;
 COORDINATE_TYPE_Waiting     = 118;
+COORDINATE_TYPE_CelebrationReady = 117;
 
 RegisterTableGoal(GOAL_ShitbirdMovement_27482, "GOAL_ShitbirdMovement_27482");
 REGISTER_GOAL_NO_SUB_GOAL( GOAL_ShitbirdMovement_27482, true );
@@ -32,11 +33,11 @@ function Shitbird:Init( ai, goal )
 	self.battleGoal = g_GoalTable[ GOAL_ShitbirdBattle_27481 ];
 	
 	ai:SetStringIndexedNumber( "moveTarget", 1 );	-- index of moveTargets table entry to which we want to go
-	ai:SetStringIndexedNumber( "state", 3 );		-- our state defines which action we do
+	ai:SetStringIndexedNumber( "state", 0 );		-- our state defines which action we do
 	ai:SetStringIndexedNumber( "battleType", 0 );	-- how do we engage enemies
 	
 	-- disable logging this
-	log:setState( nav, false );
+	log:setState( nav, true );
 	log:setState( "nav_interrupt", false );
 	
 	-- log:setThinkId( ai:GetNpcThinkParamID() );		-- whichever is initialized first
@@ -56,7 +57,18 @@ function Shitbird:Activate( ai, goal )
 	
 	-- boss fight state we do nothing else
 	if ( state == 5 ) then
-		goal:AddSubGoal( GOAL_ShitbirdGundyr_27483, 10 );
+		log( ai, nav, "I am state 5 = ", ai:GetStringIndexedNumber( "state" ) );
+		
+		if (ai:GetEventRequest(0) == 90) then
+			ai:SetStringIndexedNumber( "state", 7 );
+			return true;
+		end
+		
+		if ( ai:GetNpcThinkParamID() == 27481 ) then
+			goal:AddSubGoal( GOAL_ShitbirdGundyr_27483, 10 );
+		else
+			self:GundyrFightInit_Act08( ai, goal );
+		end
 		return true;
 	end
 	
@@ -72,6 +84,11 @@ function Shitbird:Activate( ai, goal )
 		ai:DeleteTeamReacor( COORDINATE_TYPE_Waiting );
 	end
 	
+	if ( ai:GetNumber(4) ~= 0 and ai:IsFinishTimer(4) ) then
+		ai:SetNumber( 4, 0 );
+		ai:AddTeamRecord( COORDINATE_TYPE_CelebrationReady, TARGET_NONE, 0 );
+	end
+	
 	if ( not ai:IsBothHandMode( TARGET_SELF ) ) then
 		goal:AddSubGoal( GOAL_COMMON_Attack, 10, NPC_ATK_ButtonTriangle, TARGET_SELF, 999, 0, 0 );
 	end
@@ -83,7 +100,7 @@ function Shitbird:Activate( ai, goal )
 	end
 	
 	-- do battle if need to do battle
-	if ( ai:IsBattleState() and ai:GetStringIndexedNumber( "battleType" ) ~= 2 and not ai:IsInsideTargetRegion( TARGET_ENE_0, offLimitsRegion ) ) then
+	if ( ai:IsBattleState() and ai:GetStringIndexedNumber( "battleType" ) ~= 2 and not ai:IsInsideTargetRegion( TARGET_ENE_0, offLimitsRegion ) and state < 3 ) then
 		goal:AddSubGoal( GOAL_ShitbirdBattle_27481, 10 );
 	end
 	
@@ -180,6 +197,14 @@ function Shitbird:Activate( ai, goal )
 	elseif ( state == 4 ) then
 		self:GundyrFightInit_Act08( ai, goal );
 	
+	-- post boss fight
+	elseif ( state == 7 ) then
+		self:PostGundyr_Act09( ai, goal );
+		
+	-- claw celebration
+	elseif ( state == 8 ) then
+		self:ClawCelebration_Act10( ai, goal );
+		
 	-- waiting for a friend
 	elseif ( state == 99 ) then
 		self:Wait4Friend_Act04( ai, goal );
@@ -255,7 +280,7 @@ function Shitbird:WakeTheGundyr_Act03( ai, goal )
 		local dist = ai:GetDist( POINT_EVENT );
 		-- move to pulling pos and let emevd handle the rest
 		if ( dist >= 1 ) then
-			goal:AddSubGoal( GOAL_COMMON_ApproachTarget, 2, POINT_EVENT, 0.2, TARGET_SELF, false, -1 );
+			goal:AddSubGoal( GOAL_COMMON_ApproachTarget, 2, POINT_EVENT, 1, TARGET_SELF, false, -1 );
 		end
 		
 	-- this one will do the anim
@@ -268,7 +293,7 @@ function Shitbird:WakeTheGundyr_Act03( ai, goal )
 			goal:AddSubGoal( GOAL_COMMON_DashTarget, 1, POINT_EVENT, 0.5, TARGET_SELF, -1, 1, 1 );
 		-- stretch out
 		else
-			goal:AddSubGoal( GOAL_COMMON_Attack, 10, NPC_ATK_Gesture23, TARGET_SELF, 999, 0, 0 );
+			goal:AddSubGoal( GOAL_COMMON_ComboRepeat, 10, NPC_ATK_Gesture23, TARGET_SELF, 999, 0, 0 );
 		end
 		
 	end
@@ -375,13 +400,56 @@ end
 
 function Shitbird:GundyrFightInit_Act08( ai, goal )
 	
+	goal:ClearSubGoal();
 	-- one of them was stretching out, backstep out of it
 	if ( ai:GetNpcThinkParamID() == 27480 ) then
-		goal:AddSubGoal( GOAL_COMMON_ComboRepeat, 10, NPC_ATK_ButtonXmark, TARGET_ENE_0, 999, 0, 0 );
+		-- get up and move to entrance, emevd shall handle the rest
+		ai:SetEventMoveTarget( 5500008 );
+		if ( ai:GetDist( POINT_EVENT ) > 1 ) then
+			goal:AddSubGoal( GOAL_COMMON_ApproachTarget, 6, POINT_EVENT, 1, TARGET_SELF, false, -1 ):SetLifeEndSuccess( true );
+		else
+			goal:AddSubGoal( GOAL_COMMON_Wait, 2, TARGET_SELF );
+		end
 	end
-	goal:ClearSubGoal();
 	ai:SetStringIndexedNumber( "state", 5 );
 	
+end
+
+function Shitbird:PostGundyr_Act09( ai, goal )
+	
+	local dist = ai:GetDist( TARGET_EVENT );
+	
+	log ( ai, lname, "dist = ", dist );
+	
+	if ( ai:GetNpcThinkParamID() == 27480 ) then
+		
+		if ( dist <= 2 ) then
+			-- applause
+			goal:ClearSubGoal();
+			-- goal:AddSubGoal( GOAL_COMMON_Wait, 1, TARGET_SELF ):SetLifeEndSuccess( true );
+			goal:AddSubGoal( GOAL_COMMON_ComboRepeat, 5, NPC_ATK_Gesture28, TARGET_EVENT, 999, 0, 0 ):SetLifeEndSuccess( true );
+			ai:SetTimer( 4, 4 );
+			ai:SetNumber( 4, 1 );
+			ai:SetStringIndexedNumber( "state", 8 );
+		end
+		
+	else
+		
+		-- come over
+		if ( dist > 2 ) then
+			goal:AddSubGoal( GOAL_COMMON_ApproachTarget, 5, TARGET_EVENT, 0, TARGET_SELF, false, -1 );
+		else
+			ai:AddTeamRecord( COORDINATE_TYPE_CelebrationReady, TARGET_NONE, 0 );
+			ai:SetStringIndexedNumber( "state", 8 );
+		end
+		
+	end
+end
+
+function Shitbird:ClawCelebration_Act10( ai, goal )
+	if ( ai:GetTeamRecordCount( COORDINATE_TYPE_CelebrationReady, TARGET_NONE, 0 ) >= 2 ) then
+		goal:AddSubGoal( GOAL_COMMON_ComboRepeat, 10, NPC_ATK_L1, TARGET_EVENT, 3, 0 );
+	end
 end
 
 function Shitbird:Update( ai, goal )
@@ -416,7 +484,7 @@ end
 function Shitbird:Interrupt_Shoot( ai, goal )
 	-- need this so we don't try to handle gundyr's boulders outside of his goal
 	local state = ai:GetStringIndexedNumber( "state" )
-	if ( state == 5 ) then
+	if ( state >= 5 ) then
 		return false;
 	end
 	goal:ClearSubGoal();

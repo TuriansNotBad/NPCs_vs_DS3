@@ -2,7 +2,7 @@
 --	Shitbird logic for beating the whole game
 --	Description:
 -----------------------------------------------------------------------------------------------
-LOGIC_ID_Shitbird27480 = 27480
+LOGIC_ID_Shitbird27480 = 27480;
 REGISTER_LOGIC_FUNC(LOGIC_ID_Shitbird27480, "Shitbird27480_Logic", "Shitbird27480_Interupt");
 REGISTER_GOAL_UPDATE_TIME(LOGIC_ID_Shitbird27480, 0, 0);
 
